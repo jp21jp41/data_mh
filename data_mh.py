@@ -12,7 +12,7 @@ import asyncio
 import pickle
 from google.cloud import bigquery
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QGridLayout, QPushButton, QStackedWidget, QLabel, QMainWindow
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QThread, QRunnable, QThreadPool, pyqtSlot
 from pyqtwaitingspinner import spinner
 #from google.oauth2 import service_account
 from pyspark.sql import Row
@@ -22,20 +22,48 @@ from pyspark.sql.functions import explode
 from pyspark.sql.functions import split
 from pyspark import SparkConf
 
-"""
-Configuration necessity is based on the user's configurations, and there is potential for system-level
-fault-tolerance additions.
-"""
+# Establish the User
+user = os.environ.get('USER')
 
-# Pyspark Paths
-# os.environ Pyspark Python linked to Python 311 Executable File (masked directory, the user's directory would be replacing it)
-# os.environ['PYSPARK_PYTHON'] = "~AppData/Local/Programs/Python/Python311/python.exe"
-# os.environ Pyspark Driver Python linked to Python 311 Executable File
-# os.environ['PYSPARK_DRIVER_PYTHON'] = "~AppData/Local/Programs/Python/Python311/python.exe"
+# Try PySpark Python Path with User
+try:
+    os.environ['PYSPARK_PYTHON'] = str(user) + "/AppData/Local/Programs/Python/Python311/python.exe"
+except:
+    """
+    # Enter Input to Correct Failure
+    print("\nSystem User Failure." \
+    "\nEnter \'t\' into the input to enter a \nTemporary User" \
+    "\n --or-- \n" \
+    "\nEnter \'d\' into the input to enter a \nFull Directory")
+    select = input()
+    if select == 't':
+        os.environ['USER'] = input()
+        user = os.environ['USER']
+        os.environ['PYSPARK_PYTHON'] = str(user) + "/AppData/Local/Programs/Python/Python311/python.exe"
+    elif select == 'd':
+        print("Enter Directory")
+        pyspark = input()
+        os.environ['PYSPARK_PYTHON'] = pyspark
+    else:
+        print("Input Error. Exiting Program.")
+        sys.exit()
+    """
+    print("\nSystem User Failure." \
+    "\nEnter a \nTemporary User" \
+    "\ninto the input to correct the directory.")
+    os.environ['USER'] = input()
+    try:
+        # Try User and Path Again
+        user = os.environ.get('USER')
+        print(user)
+        os.environ['PYSPARK_PYTHON'] = str(user) + "/AppData/Local/Programs/Python/Python311/python.exe"
+    except:
+        # Exit if Second Failure
+        print("Temporary User Failure. Please Restart the Program.")
+        sys.exit()
 
-"""
-The remaining directories are standard as well as private, secure, and anonymous.
-"""
+# Pyspark Driver Path
+os.environ['PYSPARK_DRIVER_PYTHON'] = str(user) + "/AppData/Local/Programs/Python/Python311/python.exe"
 
 # Spark Home Path
 os.environ['SPARK_HOME'] = "C:/spark/spark-3.5.5-bin-hadoop3"
@@ -44,35 +72,91 @@ os.environ['SPARK_HOME'] = "C:/spark/spark-3.5.5-bin-hadoop3"
 os.environ['HADOOP_HOME'] = 'C:/hadoop'
 
 # Java Home Path
-os.environ['JAVA_HOME'] = "C:\Program Files\Java\jdk-17"
+os.environ['JAVA_HOME'] = "C:/Program Files/Java/jdk-17"
+
+class WorkerSignals(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(tuple)
+    result = pyqtSignal(object)
+    progress = pyqtSignal(int)
 
 
+class SparkWorker(QRunnable):
+    def __init__(self, task_name, the_window):
+        super(SparkWorker, self).__init__()
+        self.task_name = task_name
+        self.window = the_window
 
-def initialize_pyspark(data):
-        print(data)
-        the_window = pickle.loads(data)
+    @pyqtSlot()
+    def run(self):
+        print(f"Starting task: {self.task_name} on thread {QThreadPool.globalInstance().maxThreadCount()}") # {QThreadPool.globalInstance().activeThreadCount()}")
         spark = SparkSession.builder.appName("SimpleSparkApp").getOrCreate()
-        the_window.layout2.removeWidget(the_window.init_label)
-        the_window.init_label = QLabel("Initialized \u2705")
-        the_window.layout2.addWidget(the_window.init_label, 1, 1)
+        #self.window.layout2.removeWidget(self.window.init_label)
+        #self.window.init_label = QLabel("Initialized \u2705")
+        #self.window.layout2.addWidget(self.window.init_label, 1, 1)
+        self.window.init_label.setText("Initialized \u2705")
+        self.window.pyspark_initializer.setText("Stop PySpark")
+        print(f"Finished task: {self.task_name}")
 
+class HadoopWorker(QRunnable):
+    def __init__(self, task_name, the_window):
+        super(HadoopWorker, self).__init__()
+        self.task_name = task_name
+        self.window = the_window
 
+    @pyqtSlot()
+    def run(self):
+        print(f"Starting task: {self.task_name} on thread {QThreadPool.globalInstance().maxThreadCount()}") # {QThreadPool.globalInstance().activeThreadCount()}")
+        session = requests.session()
+        self.window.client = hdfs.InsecureClient('http://localhost:9871', user='justi')
+        print("Client:")
+        print(self.window.client)
+        #self.window.layout2.removeWidget(self.window.init_label)
+        #self.window.init_label = QLabel("Initialized \u2705")
+        #self.window.layout2.addWidget(self.window.init_label, 1, 1)
+        self.window.init_label.setText("Initialized \u2705")
+        self.window.hadoop_initializer.setText("Stop Hadoop")
+        print(f"Finished task: {self.task_name}")
 
-class QLPickle(QLabel):
-    def __init__(self):
-        super().__init__()
-        pickle.dumps(self)
+class HadoopEndWorker(QRunnable):
+    def __init__(self, task_name, the_window):
+        super(HadoopEndWorker, self).__init__()
+        self.task_name = task_name
+        self.window = the_window
+
+    @pyqtSlot()
+    def run(self):
+        print(f"Starting task: {self.task_name} on thread {QThreadPool.globalInstance().maxThreadCount()}") # {QThreadPool.globalInstance().activeThreadCount()}")
+        with self.window.client.read('features') as reader:
+            features = reader.read()
+        try:
+            print(self.worker.client)
+        except:
+            pass
+        self.window.init_label.setText("Terminated \u0001F5CE")
+        self.window.hadoop_initializer.setText("Run Hadoop")
+        print(f"Finished task: {self.task_name}")
+
+class Worker(QRunnable):
+    def __init__(self, task_name):
+        super(Worker, self).__init__()
+        self.task_name = task_name
+
+    @pyqtSlot()
+    def run(self):
+        # Your long-running task goes here
+        print(f"Starting task: {self.task_name} on thread {QThreadPool.globalInstance().maxThreadCount()}") # {QThreadPool.globalInstance().activeThreadCount()}")
+        time.sleep(1.5) # Simulate a long-running task
+        print(f"Finished task: {self.task_name}")
 
 class MyWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.pickled = [pickle.dumps(self)]
         self.setWindowTitle("Data Migration Hub")
         self.setGeometry(100, 100, 500, 200)  # x, y, width, height
         self.stacked_widget = QStackedWidget()
-        #self.pickled_stacked = Widget_to_Pickle(self.stacked_widget)
         self.setCentralWidget(self.stacked_widget)
-        #self.append_pickled_data([self.pickled_stacked])
+        self.worker_list = []
 
 
         self.front_page = QWidget()
@@ -82,8 +166,6 @@ class MyWindow(QMainWindow):
         self.layout1.addWidget(self.to_pyspark)
         self.to_hadoop = QPushButton("Hadoop")
         self.layout1.addWidget(self.to_hadoop)
-        #self.append_pickled_data([self.front_page, self.layout1, self.to_pyspark,
-        #                          self.to_hadoop])
 
 
         self.pyspark_page = QWidget()
@@ -95,13 +177,13 @@ class MyWindow(QMainWindow):
         self.to_front_page1.setFixedSize(500, 25)
         self.layout2.addWidget(self.to_front_page1, 2, 0)
         self.hadoop_page = QWidget()
-        layout3 = QVBoxLayout(self.hadoop_page)
-        layout3.addWidget(QLabel("Hadoop"))
+        self.layout3 = QGridLayout(self.hadoop_page)
+        self.layout3.addWidget(QLabel("Hadoop"), 0, 0)
+        self.hadoop_initializer = QPushButton("Run Hadoop")
+        self.layout3.addWidget(self.hadoop_initializer, 1, 0)
         self.to_front_page2 = QPushButton("Front Page")
-        layout3.addWidget(self.to_front_page2)
-        #self.append_pickled_data([self.pyspark_page, self.layout2, self.pyspark_initializer,
-        #                          self.to_front_page1, self.layout2, self.hadoop_page,
-        #                          layout3, self.to_front_page2])
+        self.to_front_page2.setFixedSize(500, 25)
+        self.layout3.addWidget(self.to_front_page2, 2, 0)
 
         
         self.stacked_widget.addWidget(self.front_page)
@@ -110,29 +192,14 @@ class MyWindow(QMainWindow):
 
         self.to_pyspark.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.pyspark_page))
         self.to_hadoop.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.hadoop_page))
-        self.pyspark_initializer.clicked.connect(lambda: self.start_pyspark())
+        self.lambda_start_pyspark = lambda: self.start_pyspark()
+        self.lambda_stop_pyspark = lambda: self.stop_pyspark()
+        self.lambda_start_hadoop = lambda: self.start_hadoop()
+        self.lambda_stop_hadoop = lambda: self.stop_hadoop()
+        self.pyspark_initializer.clicked.connect(self.lambda_start_pyspark)
+        self.hadoop_initializer.clicked.connect(self.lambda_start_hadoop)
         self.to_front_page1.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.front_page))
         self.to_front_page2.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.front_page))
-    
-    def append_pickled_data(self, items):
-        for item in items:
-            self.pickled.append(item.pickled)
-
-    def __getstate__(self):
-        # Return a dictionary of attributes to be pickled
-        # Exclude 'gui_element' as it's unpicklable
-        state = self.__dict__.copy()
-        try:
-            del state['gui_element']
-        except:
-            pass
-        return state
-    
-    def __setstate__(self, state):
-        # Restore attributes from the pickled state
-        self.__dict__.update(state)
-        # Re-initialize unpicklable attributes
-        self.gui_element = "reinitialized_gui_object"
     
     def quick_geometry_QPushButton(self, text, geometry = (100, 100, 300, 25)):
         the_button = QPushButton(text)
@@ -145,29 +212,53 @@ class MyWindow(QMainWindow):
         return the_button
     
     def start_pyspark(self):
-        self.init_label = QLabel("Initializing...")
-        layout_pickle = {
-            "label_text": self.init_label.text(),
-            "row": 0,  # e.g., the row position
-            "column": 1, # e.g., the column position
-            "row_span": 1,
-            "col_span": 1,
-            "alignment": int(self.init_label.alignment()),
-            # ... other properties
-            }
-        self.init_label.pickled = pickle.dumps(self.init_label)
+        try:
+            self.init_label.setText("Initializing...")
+        except Exception as e:
+            self.init_label = QLabel("Initializing...")
+            self.layout2.addWidget(self.init_label, 1, 1)
+        worker = SparkWorker("PySpark",  self)
+        print("Horizontal:")
+        QThreadPool.globalInstance().start(worker)
+
+    def start_hadoop(self):
+        try:
+            self.init_label.setText("Initializing...")
+        except Exception as e:
+            self.init_label = QLabel("Initializing...")
+            self.layout3.addWidget(self.init_label, 1, 1)
+        worker = HadoopWorker("Hadoop", self)
+        QThreadPool.globalInstance().start(worker)
+        self.hadoop_initializer.clicked.disconnect(self.lambda_start_hadoop)
+        self.hadoop_initializer.clicked.connect(self.lambda_stop_hadoop)
+    
+    def stop_hadoop(self):
+        self.init_label.setText("Terminating...")
+        worker = HadoopEndWorker("End Hadoop", self)
+        QThreadPool.globalInstance().start(worker)
+        self.hadoop_initializer.clicked.disconnect(self.lambda_stop_hadoop)
+        self.hadoop_initializer.clicked.connect(self.lambda_start_hadoop)
+    
+    def sure_remove(self):
+        self.layout2.removeWidget(self.init_label)
+        self.init_label = QLabel("Initialized \u2705")
         self.layout2.addWidget(self.init_label, 1, 1)
-        #No Pickled Attribute
-        self.append_pickled_data([self.init_label])
-        app.processEvents()
-        self.process = Process(target=initialize_pyspark, args=self.pickled)
-        self.process.start()
 
-        
+    def start_task1(self):
+        self.label.setText("Task 1 running...")
+        worker = Worker("Task 1")
+        QThreadPool.globalInstance().start(worker) # Submit to the pool
 
-        
+    def start_task2(self):
+        self.label.setText("Task 2 running...")
+        worker = Worker("Task 2")
+        QThreadPool.globalInstance().start(worker) # Submit to the pool
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MyWindow()
     window.show()
     sys.exit(app.exec())
+
+
