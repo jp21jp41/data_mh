@@ -1,7 +1,7 @@
 # data_mh
 Data Migration Hub (WIP)
 
-The current case is very limited. Multiprocessing is to be a great portion of the application, because the quite generous capabilities of such an application would be greatly hindered by tools that it supports, since they would stop the system from being able to run properly. The greatest benefit actually lies in the ability to run multiple programs at once, allowing data to be collected, tested, transformed, etc., all at once.
+The current case is very limited. Multithreading is to be a great portion of the application, because the quite generous capabilities of such an application would be greatly hindered by tools that it supports, since they would stop the system from being able to run properly. The greatest benefit actually lies in the ability to run multiple programs at once, allowing data to be collected, tested, transformed, etc., all at once.
 
 "Pipelining would be a necessary replacement for the tools simply being run at a straightforward button push. Given Python specifically, data needs to be "pickled" such that it stays implementable through the entire system."
 
