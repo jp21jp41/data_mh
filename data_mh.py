@@ -238,21 +238,6 @@ class MyWindow(QMainWindow):
         QThreadPool.globalInstance().start(worker)
         self.hadoop_initializer.clicked.disconnect(self.lambda_stop_hadoop)
         self.hadoop_initializer.clicked.connect(self.lambda_start_hadoop)
-    
-    def sure_remove(self):
-        self.layout2.removeWidget(self.init_label)
-        self.init_label = QLabel("Initialized \u2705")
-        self.layout2.addWidget(self.init_label, 1, 1)
-
-    def start_task1(self):
-        self.label.setText("Task 1 running...")
-        worker = Worker("Task 1")
-        QThreadPool.globalInstance().start(worker) # Submit to the pool
-
-    def start_task2(self):
-        self.label.setText("Task 2 running...")
-        worker = Worker("Task 2")
-        QThreadPool.globalInstance().start(worker) # Submit to the pool
 
 
 if __name__ == "__main__":
@@ -260,5 +245,6 @@ if __name__ == "__main__":
     window = MyWindow()
     window.show()
     sys.exit(app.exec())
+
 
 
