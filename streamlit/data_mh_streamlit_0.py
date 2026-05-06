@@ -149,14 +149,14 @@ def close_session(sid):
 @st.fragment(run_every=1)
 def control_panel(sid):
     """The UI logic for each tab."""
-    btn_label = st.session_state.get(f"{sid}_status", f"Run {sid.title()}")
+    btn_label = st.session_state.get(f"{sid}_status", f"Run {sid}")
     
     if st.button(btn_label, key=f"btn_{sid}"):
         if "Run" in btn_label:
             # START LOGIC
             st.session_state[f"{sid}_running"] = True # The Kill Switch flag
             st.session_state[f"{sid}_label"] = "Initializing... ⚙️"
-            st.session_state[f"{sid}_status"] = f"Stop {sid.title()}"
+            st.session_state[f"{sid}_status"] = f"Stop {sid}"
             
             t = threading.Thread(target=generic_worker, args=(sid,))
             add_script_run_ctx(t)
@@ -166,7 +166,7 @@ def control_panel(sid):
             st.session_state[f"{sid}_running"] = False # Signal thread to stop
             close_session(sid) # Kill the connection
             st.session_state[f"{sid}_label"] = "Idle 💤"
-            st.session_state[f"{sid}_status"] = f"Run {sid.title()}"
+            st.session_state[f"{sid}_status"] = f"Run {sid}"
             st.session_state[f"{sid}_ready"] = False
         
         st.rerun()
@@ -209,10 +209,10 @@ def global_status_monitor():
 # --- MAIN UI ---
 st.title("Data Migration Hub")
 
-service_list = ["PySpark", "Hadoop", "System Logs", "cloud_local", "cloud_aws", "cloud_minio"]
+service_list = ["PySpark", "Hadoop", "System Logs", "Cloud Local", "Cloud AWS", "Cloud MinIO"]
 
 # Create the Tabs dynamically
-tabs = st.tabs([s.replace("_", " ").title() for s in service_list])
+tabs = st.tabs([s for s in service_list])
 
 
 with st.sidebar:
@@ -229,7 +229,6 @@ with st.sidebar:
 # Loop through and fill the tabs
 for i, service_id in enumerate(service_list):
     with tabs[i]:
-        st.header(f"{service_id.replace('_', ' ').title()} Control")
+        st.header(f"{service_id} Control")
         # Just call the function we defined above
         control_panel(service_id)
-
