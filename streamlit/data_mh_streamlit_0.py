@@ -82,7 +82,7 @@ def generic_session(name):
     if name == "PySpark":
         return SparkSession.builder.appName("StreamlitSpark").getOrCreate()
     elif name == "Hadoop":
-        return hdfs.InsecureClient('http://localhost:9871', user='justi')
+        return hdfs.InsecureClient('http://localhost:9871', user=os.environ('USERNAME'))
     if name == "cloud_aws":
         try:
             # Initialize the S3 client
