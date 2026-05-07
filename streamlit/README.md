@@ -1,2 +1,2 @@
-# Streamlit Features
+# Early-Stage Data Migration: Streamlit
 The Streamlit Version of this application allows for a simple, quick setup for multiple Big Data tools. This means being able to have everything run with multithreading. It is simply to pose the framework for now. Ideally, it can all be put together with options for manual code, buttons to perform operations and design with, and potentially even a code agent of sorts with time. While these and other pieces of the application are not yet conceptualized in a full, reasonably programmable form, they will unfortunately not yet be uncovered.
